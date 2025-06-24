@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CanaLytics</title>
+    
+    <!-- CSS Bootstrap e FontAwesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- CSS Leaflet e Plugins -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css" />
+    <!-- Se você decidir usar MarkerCluster no futuro, descomente os CSS dele aqui -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.1/MarkerCluster.css" /> -->
+    <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.1/MarkerCluster.Default.css" /> -->
+    
+    <!-- Seu CSS customizado -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- SCRIPTS DE BIBLIOTECAS (jQuery primeiro, depois Leaflet, depois plugins Leaflet) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+    <script src="https://unpkg.com/leaflet-geometryutil"></script>
+    <!-- leaflet-heat.js é usado para o heatmap. O link do Folium pode não ser o ideal se não estivermos usando Folium.
+         Alternativamente, podemos usar um CDN direto para leaflet-heat se disponível, ou hospedá-lo.
+         Por enquanto, vamos manter o link que o Folium usaria, pois ele funciona.
+         Se você encontrar um CDN mais genérico para leaflet-heat (ex: de um repo do plugin Leaflet-Heat), pode ser melhor.
+    -->
+    <script src="https://cdn.jsdelivr.net/gh/python-visualization/folium@main/folium/templates/leaflet_heat.min.js"></script>
+    <!-- Se usar MarkerCluster, adicione o JS dele aqui também -->
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.1/leaflet.markercluster.js"></script> -->
+    
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#"><i class="fas fa-leaf me-2"></i>CanaLytics</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#areaFormModal">
+                            <i class="fas fa-plus-circle me-1"></i> Novo Talhão
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#addAnalysisModal">
+                        <i class="fas fa-plus-square me-1"></i> Nova Análise
+                    </a>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#reportModal">
+                            <i class="fas fa-file-export me-1"></i> Relatórios
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#helpModal">
+                            <i class="fas fa-question-circle me-1"></i> Ajuda
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container-fluid py-4">
+        <div class="row">
+            <!-- Coluna Esquerda: Clima -->
+            <div class="col-md-3">
+                <div class="card weather-card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <i class="fas fa-cloud-sun me-2"></i>Clima Atual
+                        <button class="btn btn-sm btn-light float-end" id="refresh-weather">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="card-body" id="current-weather">
+                        <!-- Conteúdo do clima atual será preenchido pelo JS -->
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Carregando...</span>
+                            </div>
+                            <p>Carregando clima...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card weather-card">
+                     <div class="card-header bg-info text-white">
+                         <i class="fas fa-calendar-alt me-2"></i>Previsão 7 Dias
+                     </div>
+                     <div class="card-body" id="forecast">
+                         <!-- Conteúdo da previsão será preenchido pelo JS -->
+                         <div class="text-center">
+                             <div class="spinner-border text-info" role="status">
+                                 <span class="visually-hidden">Carregando...</span>
+                             </div>
+                             <p>Carregando previsão...</p>
+                         </div>
+                     </div>
+                </div>
+            </div>
+            
+            <!-- Coluna Direita: Mapa -->
+            <div class="col-md-9">
+                <div class="card soil-card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <i class="fas fa-map-marked-alt me-2"></i>Mapa de Solo
+                        <!-- Botão "Salvar Área Desenhada" comentado/removido para o novo fluxo.
+                             Se você quiser manter um botão aqui, a lógica no JS precisará ser ajustada
+                             para que este botão abra o modal #newAreaModal após um desenho.
+                        -->
+                        <!-- 
+                        <div class="float-end">
+                            <button class="btn btn-sm btn-light" id="save-drawn-area" disabled>
+                                <i class="fas fa-save me-1"></i> Salvar Área Desenhada
+                            </button>
+                        </div>
+                        -->
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="parameter-select" class="form-label">Parâmetro:</label>
+                                <select class="form-select" id="parameter-select"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="area-select" class="form-label">Área:</label>
+                                <select class="form-select" id="area-select"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="view-type" class="form-label">Visualização:</label>
+                                <select class="form-select" id="view-type">
+                                    <option value="markers">Marcadores</option>
+                                    <option value="heatmap">Mapa de Calor</option>
+                                    <option value="both">Ambos</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="map-container" class="map-container position-relative">
+                            <!-- O mapa Leaflet será renderizado aqui pelo script.js -->
+                            <!-- O loading-overlay será adicionado/removido pelo script.js -->
+                        </div>
+                        <div class="mt-3">
+                            <p class="mb-0"><small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i> Use as ferramentas de desenho (<i class="fas fa-draw-polygon"></i>, <i class="far fa-square"></i>) no mapa para definir um novo talhão.
+                                As informações serão preenchidas no formulário "Novo Talhão".
+                            </small></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Novo Talhão -->
+    <div class="modal fade" id="areaFormModal" tabindex="-1" aria-labelledby="areaFormModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="areaFormModalLabel">Novo Talhão</h5> <!-- O título mudará via JS -->
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <form id="new-area-form">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="area-name" class="form-label">Nome do Talhão:</label>
+                                <input type="text" class="form-control" id="area-name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="area-description" class="form-label">Descrição:</label>
+                                <textarea class="form-control" id="area-description" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="area-size" class="form-label">Tamanho (hectares):</label>
+                                <input type="number" class="form-control" id="area-size" step="0.01" min="0">
+                                <small class="text-muted" id="alqueires-info">Equivalente a: <span id="area-alqueires">0.00</span> Alqueires Paulistas</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="area-coordinates-display" class="form-label">Coordenadas (JSON):</label>
+                                <textarea class="form-control" id="area-coordinates-display" rows="5" readonly placeholder="Desenhe a área no mapa."></textarea>
+                                <input type="hidden" id="area-coordinates">
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h6>Dados de Solo (Opcional - se não preenchido, usará simulação)</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="param-ph" class="form-label">pH:</label>
+                            <input type="number" class="form-control form-control-sm" id="param-ph" step="0.1">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="param-nitrogenio" class="form-label">Nitrogênio (ppm):</label>
+                            <input type="number" class="form-control form-control-sm" id="param-nitrogenio" step="1">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="param-fosforo" class="form-label">Fósforo (ppm):</label>
+                            <input type="number" class="form-control form-control-sm" id="param-fosforo" step="1">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="param-potassio" class="form-label">Potássio (ppm):</label>
+                            <input type="number" class="form-control form-control-sm" id="param-potassio" step="1">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="param-umidade" class="form-label">Umidade (%):</label>
+                            <input type="number" class="form-control form-control-sm" id="param-umidade" step="1" min="0" max="100">
+                        </div>
+                         <div class="col-md-4 mb-3">
+                            <label for="analysis-date" class="form-label">Data da Análise:</label>
+                            <input type="date" class="form-control form-control-sm" id="analysis-date">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="param-notes" class="form-label">Notas da Análise:</label>
+                        <textarea class="form-control form-control-sm" id="param-notes" rows="2"></textarea>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger me-auto" id="delete-area-btn" style="display: none;">Excluir Talhão</button> <!-- Botão de deletar, escondido inicialmente -->
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="save-area-changes-btn">Salvar</button> <!-- Texto mudará via JS -->
+            </div>
+        </div>
+    </div>
+    </div>
+    
+    <!-- Modal de Relatórios -->
+    <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="reportModalLabel"><i class="fas fa-file-export me-2"></i>Gerar Relatórios</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="soil-tab" data-bs-toggle="tab" data-bs-target="#soil-report-pane" type="button" role="tab" aria-controls="soil-report-pane" aria-selected="true">Dados de Solo</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="weather-tab" data-bs-toggle="tab" data-bs-target="#weather-report-pane" type="button" role="tab" aria-controls="weather-report-pane" aria-selected="false">Dados Climáticos</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="reportTabsContent">
+                        <div class="tab-pane fade show active" id="soil-report-pane" role="tabpanel" aria-labelledby="soil-tab" tabindex="0">
+                            <form id="soil-report-form" class="mt-3">
+                                <input type="hidden" name="report_type" value="soil">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="soil-parameter" class="form-label">Parâmetro:</label>
+                                        <select class="form-select" id="soil-parameter" name="parameter_id">
+                                            <option value="">Todos os Parâmetros</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="soil-area" class="form-label">Área:</label>
+                                        <select class="form-select" id="soil-area" name="area_id">
+                                            <option value="">Todas as Áreas</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="generateReport('soil')">
+                                    <i class="fas fa-download me-2"></i>Baixar Relatório CSV
+                                </button>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade" id="weather-report-pane" role="tabpanel" aria-labelledby="weather-tab" tabindex="0">
+                            <form id="weather-report-form" class="mt-3">
+                                <input type="hidden" name="report_type" value="weather">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="weather-start-date" class="form-label">Data Inicial:</label>
+                                        <input type="date" class="form-control" id="weather-start-date" name="start_date">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="weather-end-date" class="form-label">Data Final:</label>
+                                        <input type="date" class="form-control" id="weather-end-date" name="end_date">
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="generateReport('weather')">
+                                    <i class="fas fa-download me-2"></i>Baixar Relatório CSV
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Ajuda -->
+    <div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="helpModalLabel"><i class="fas fa-question-circle me-2"></i>Ajuda</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <h5>Sistema de Monitoramento para Usinas de Cana-de-Açúcar</h5>
+                    <p>Este sistema permite monitorar condições de solo e clima em tempo real para otimizar a gestão agrícola.</p>
+                    <h6 class="mt-4">Funcionalidades:</h6>
+                    <ul>
+                        <li><strong>Mapa Interativo:</strong> Visualize parâmetros do solo com mapas de calor e marcadores. Use o controle de camadas (<i class="fas fa-layer-group"></i>) para alternar entre o mapa padrão e a visão de satélite.</li>
+                        <li><strong>Desenho de Talhões:</strong> Use as ferramentas de desenho para criar novos talhões diretamente no mapa. As coordenadas serão capturadas automaticamente.</li>
+                        <li><strong>Previsão do Tempo:</strong> Consulte dados meteorológicos atuais e previsão para 7 dias.</li>
+                        <li><strong>Relatórios:</strong> Exporte dados históricos em formato CSV para análise detalhada.</li>
+                    </ul>
+                    <h6 class="mt-4">Como usar:</h6>
+                    <ol>
+                        <li>Use os filtros no mapa para selecionar parâmetros e áreas específicas.</li>
+                        <li>Para criar um novo talhão, use as ferramentas de desenho (<i class="fas fa-draw-polygon"></i> ou <i class="far fa-square"></i>) no canto superior esquerdo do mapa.</li>
+                        <li>Após desenhar, as informações da área (como coordenadas) serão preenchidas no formulário "Novo Talhão". Complete os outros campos e salve.</li>
+                        <li>Gere relatórios para análise histórica dos dados.</li>
+                    </ol>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para Adicionar Nova Análise de Solo -->
+    <div class="modal fade" id="addAnalysisModal" tabindex="-1" aria-labelledby="addAnalysisModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="addAnalysisModalLabel"><i class="fas fa-flask me-2"></i>Adicionar Análise de Solo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-analysis-form">
+                        <div class="mb-3">
+                            <label for="analysis-area-select" class="form-label">Talhão (Área):</label>
+                            <select class="form-select" id="analysis-area-select" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="analysis-parameter-select" class="form-label">Parâmetro de Solo:</label>
+                            <select class="form-select" id="analysis-parameter-select" required></select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="analysis-value" class="form-label">Valor Medido:</label>
+                            <input type="number" class="form-control" id="analysis-value" step="any" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="analysis-input-date" class="form-label">Data da Análise:</label>
+                            <input type="date" class="form-control" id="analysis-input-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="analysis-notes" class="form-label">Notas (Opcional):</label>
+                            <textarea class="form-control" id="analysis-notes" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="save-analysis-btn">Salvar Análise</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para Visualizar Histórico de Análises de Solo -->
+    <div class="modal fade" id="soilHistoryModal" tabindex="-1" aria-labelledby="soilHistoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl"> <!-- modal-xl para mais espaço para a tabela -->
+            <div class="modal-content">
+                <div class="modal-header bg-secondary text-white">
+                    <h5 class="modal-title" id="soilHistoryModalLabel"><i class="fas fa-history me-2"></i>Histórico de Análises de Solo</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 id="history-area-name" class="mb-3">Talhão: Carregando...</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="history-parameter-select" class="form-label">Selecionar Parâmetro para Histórico:</label>
+                            <select class="form-select" id="history-parameter-select">
+                                <!-- Opções de parâmetros serão populadas pelo JS -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Data da Análise</th>
+                                    <th>Parâmetro</th>
+                                    <th>Valor</th>
+                                    <th>Unidade</th>
+                                    <th>Notas</th>
+                                    <!-- Poderíamos adicionar ações aqui no futuro (Editar/Excluir Leitura) -->
+                                </tr>
+                            </thead>
+                            <tbody id="soil-history-table-body">
+                                <!-- Linhas da tabela serão populadas pelo JS -->
+                                <tr><td colspan="5" class="text-center">Selecione um parâmetro para ver o histórico.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Área para gráfico (opcional, para o futuro) -->
+                    <!-- <canvas id="soilHistoryChart"></canvas> -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+ 
+
+    <!-- Scripts no final do body (Bootstrap JS e seu script.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script> 
+</body>
+</html>

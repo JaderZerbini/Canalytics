@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste AwesomeMarkers</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+</head>
+<body>
+    <div id="map" style="height: 400px;"></div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("L:", L);
+            console.log("L.AwesomeMarkers:", L.AwesomeMarkers);
+            if (L && L.AwesomeMarkers && L.AwesomeMarkers.icon) {
+                console.log("AwesomeMarkers carregado com sucesso!");
+                var map = L.map('map').setView([51.505, -0.09], 13);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                var redMarker = L.AwesomeMarkers.icon({
+                    icon: 'coffee',
+                    markerColor: 'red'
+                });
+                L.marker([51.5, -0.09], {icon: redMarker}).addTo(map);
+            } else {
+                console.error("Falha ao carregar AwesomeMarkers!");
+            }
+        });
+    </script>
+</body>
+</html>
